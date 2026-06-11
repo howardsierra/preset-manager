@@ -1,0 +1,120 @@
+/* Preset Organizer — styles for the chat completion prompt manager.
+   Each section gets its own accent color via --porg-accent (set in JS,
+   cycling a fixed palette down the list). */
+
+/* ---------- toolbar ---------- */
+#porg_toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 6px 0 8px;
+}
+#porg_toolbar .porg-tb-icon { opacity: .55; }
+#porg_search { flex: 1; min-width: 0; }
+.porg-tb-btn {
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 6px;
+    opacity: .7;
+    transition: opacity .15s, background .15s;
+}
+.porg-tb-btn:hover {
+    opacity: 1;
+    background: rgba(139, 124, 255, .18);
+}
+
+/* ---------- section headers ---------- */
+li.completion_prompt_manager_prompt.porg-header {
+    --porg-accent: #8B7CFF;
+    background: linear-gradient(90deg,
+        color-mix(in srgb, var(--porg-accent) 24%, transparent),
+        color-mix(in srgb, var(--porg-accent) 5%, transparent));
+    border-left: 3px solid var(--porg-accent);
+    border-radius: 6px;
+    margin-top: 6px;
+    cursor: pointer;
+    user-select: none;
+}
+li.porg-header:hover {
+    background: linear-gradient(90deg,
+        color-mix(in srgb, var(--porg-accent) 34%, transparent),
+        color-mix(in srgb, var(--porg-accent) 8%, transparent));
+}
+li.porg-header .completion_prompt_manager_prompt_name {
+    font-weight: 700;
+    letter-spacing: .02em;
+}
+
+/* caret */
+.porg-caret {
+    display: inline-block;
+    margin-right: 7px;
+    font-size: .8em;
+    color: var(--porg-accent, #8B7CFF);
+    transition: transform .18s ease;
+}
+.porg-caret.porg-rot { transform: rotate(-90deg); }
+
+/* enabled/total badge — tinted with the section's accent */
+.porg-badge {
+    margin-left: 8px;
+    padding: 1px 8px;
+    border-radius: 999px;
+    font-size: .72em;
+    font-weight: 600;
+    background: color-mix(in srgb, var(--porg-accent, #8B7CFF) 22%, transparent);
+    color: color-mix(in srgb, var(--porg-accent, #8B7CFF) 65%, white);
+    border: 1px solid color-mix(in srgb, var(--porg-accent, #8B7CFF) 40%, transparent);
+    vertical-align: 1px;
+}
+.porg-badge-full {
+    background: color-mix(in srgb, var(--porg-accent, #8B7CFF) 38%, transparent);
+}
+.porg-badge-off {
+    background: rgba(255, 255, 255, .06);
+    color: rgba(255, 255, 255, .45);
+    border-color: rgba(255, 255, 255, .12);
+}
+
+/* bulk section toggle */
+.porg-bulk {
+    cursor: pointer;
+    margin-right: 8px;
+    opacity: .75;
+    transition: opacity .15s;
+}
+.porg-bulk:hover { opacity: 1; }
+.porg-bulk.fa-toggle-on { color: var(--porg-accent, #4ECDC4); }
+.porg-bulk.fa-toggle-off { color: rgba(255, 255, 255, .4); }
+
+/* ---------- member rows: colored rail in the section's accent ---------- */
+li.completion_prompt_manager_prompt.porg-member {
+    margin-left: 10px;
+    border-left: 2px solid color-mix(in srgb, var(--porg-accent, #8B7CFF) 35%, transparent);
+    padding-left: 8px;
+    border-radius: 0 4px 4px 0;
+}
+li.completion_prompt_manager_prompt.porg-member:hover {
+    border-left-color: var(--porg-accent, #8B7CFF);
+}
+
+li.completion_prompt_manager_prompt.porg-collapsed-hide,
+li.completion_prompt_manager_prompt.porg-search-hide {
+    display: none !important;
+}
+
+/* ---------- settings drawer ---------- */
+#porg_settings small {
+    display: block;
+    opacity: .65;
+    margin-top: 4px;
+}
+#porg_settings code {
+    background: rgba(139, 124, 255, .15);
+    padding: 0 4px;
+    border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .porg-caret, .porg-tb-btn, .porg-bulk { transition: none !important; }
+}
