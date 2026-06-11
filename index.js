@@ -494,6 +494,13 @@
                     <div class="flex-container marginTop5">
                         <div id="porg_pattern_reset" class="menu_button">Reset to default</div>
                     </div>
+                    <hr>
+                    <label class="checkbox_label">
+                        <input id="porg_organize_ext" type="checkbox">
+                        <span>Organize the Extensions panel (Context Lens style)</span>
+                    </label>
+                    <small>Categories, pinning, and search for extension drawers.
+                    Refresh the page after turning this off.</small>
                 </div>
             </div>`;
         host.appendChild(wrap);
@@ -510,6 +517,16 @@
             settings().pattern = DEFAULT_PATTERN;
             save();
             apply();
+        });
+
+        const orgExt = wrap.querySelector('#porg_organize_ext');
+        orgExt.checked = settings().organizeExtensions !== false;
+        orgExt.addEventListener('change', () => {
+            settings().organizeExtensions = orgExt.checked;
+            save();
+            if (typeof toastr !== 'undefined' && !orgExt.checked) {
+                toastr.info('Refresh the page to restore the vanilla Extensions panel', 'Preset Organizer');
+            }
         });
     }
 
@@ -539,6 +556,331 @@
             if (ev) eventSource.on(ev, () => setTimeout(() => { apply(); addNavButtons(); }, 100));
         }
         console.log('[Preset Organizer] ready');
+    }
+
+    if (window.SillyTavern?.getContext) {
+        const { eventSource, event_types } = ctx();
+        eventSource.once(event_types.APP_READY, init);
+        if (document.getElementById('extensionsMenu')) init();
+    }
+})();
+
+/* ====================================================================== */
+/* Extensions Panel Organizer (integrated, v1.3.0)                         */
+/*                                                                         */
+/* NemoPresetExt-style overhaul of the Extensions settings panel, styled   */
+/* like Context Lens: solid navy category cards, gradient accent headers,  */
+/* monogram tiles, count chips, sticky search toolbar.                     */
+/*                                                                         */
+/* Shares its saved data (pins/categories) with the standalone             */
+/* "Extension Organizer" extension, and automatically stands down if the   */
+/* standalone is detected, so running both never causes a fight.           */
+/* ====================================================================== */
+
+(() => {
+    'use strict';
+
+    const DATA = 'extensionOrganizer';     // shared with the standalone on purpose
+    const HOST = 'presetOrganizer';        // master toggle lives with Preset Organizer
+
+    const PALETTE = ['#6FB8FF', '#FF6B9D', '#FFB347', '#4ECDC4', '#A8E05F', '#8B7CFF', '#FF8C66', '#E07BE0'];
+    const PINNED = '⭐ Pinned';
+    const OTHER = 'Other';
+    const HOSTS = ['extensions_settings', 'extensions_settings2'];
+
+    const ctx = () => SillyTavern.getContext();
+
+    function data() {
+        const es = ctx().extensionSettings;
+        es[DATA] = es[DATA] || {
+            grouping: true, sortAlpha: false, pinned: [], cats: {},
+            customCats: ['Roleplay', 'UI', 'Memory', 'Tools'], collapsed: {},
+        };
+        return es[DATA];
+    }
+
+    function hostEnabled() {
+        const es = ctx().extensionSettings;
+        es[HOST] = es[HOST] || {};
+        return es[HOST].organizeExtensions !== false;
+    }
+
+    function save() { ctx().saveSettingsDebounced(); }
+
+    function standaloneActive() {
+        return !!document.getElementById('extorg_toolbar');
+    }
+
+    /* ---------------- drawer discovery ---------------- */
+
+    const originalOrder = new Map();
+    let orderCounter = 0;
+
+    function drawerName(el) {
+        return el.querySelector('.inline-drawer-header b, .inline-drawer-header')
+            ?.textContent?.trim() ?? '';
+    }
+
+    function collectDrawers() {
+        const found = [];
+        const seen = new Set();
+        const take = (child) => {
+            if (child.id?.startsWith('porgx_')) return;
+            if (!child.querySelector?.('.inline-drawer-header')) return;
+            const name = drawerName(child);
+            if (!name || seen.has(name)) return;
+            seen.add(name);
+            if (!originalOrder.has(name)) originalOrder.set(name, orderCounter++);
+            found.push({ el: child, name });
+        };
+        for (const id of HOSTS) {
+            const host = document.getElementById(id);
+            if (host) [...host.children].forEach(take);
+        }
+        document.querySelectorAll('#porgx_shelf .porgx-cat-body > *').forEach(take);
+        return found;
+    }
+
+    /* ---------------- category model ---------------- */
+
+    const categoryOf = (name) => data().pinned.includes(name) ? PINNED : (data().cats[name] || OTHER);
+    const categoryList = () => [PINNED, ...data().customCats, OTHER];
+    function catColor(cat) {
+        if (cat === PINNED) return '#FFD700';
+        if (cat === OTHER) return '#7E8799';
+        const i = data().customCats.indexOf(cat);
+        return PALETTE[(i >= 0 ? i : 0) % PALETTE.length];
+    }
+
+    /* ---------------- apply ---------------- */
+
+    let applying = false;
+    let organizeMode = false;
+    let query = '';
+
+    function apply() {
+        if (applying || !hostEnabled() || standaloneActive()) return;
+        const host = document.getElementById(HOSTS[0]);
+        if (!host) return;
+        applying = true;
+        try {
+            ensureToolbar();
+            let sh = document.getElementById('porgx_shelf');
+            if (!sh) {
+                sh = document.createElement('div');
+                sh.id = 'porgx_shelf';
+                host.appendChild(sh);
+            }
+            sh.classList.toggle('porgx-organize', organizeMode);
+
+            const drawers = collectDrawers();
+            const groups = new Map();
+            for (const d of drawers) {
+                const cat = categoryOf(d.name);
+                if (!groups.has(cat)) groups.set(cat, []);
+                groups.get(cat).push(d);
+            }
+
+            const s = data();
+            for (const cat of categoryList()) {
+                const members = groups.get(cat) || [];
+                let section = sh.querySelector(`[data-porgx-cat="${CSS.escape(cat)}"]`);
+                if (!members.length) { section?.remove(); continue; }
+
+                if (!section) {
+                    section = document.createElement('div');
+                    section.className = 'porgx-cat';
+                    section.dataset.porgxCat = cat;
+                    section.innerHTML = `
+                        <div class="porgx-cat-head">
+                            <span class="porgx-mono"></span>
+                            <span class="porgx-cat-name"></span>
+                            <span class="porgx-cat-count"></span>
+                            <span class="porgx-cat-caret fa-solid fa-chevron-down"></span>
+                        </div>
+                        <div class="porgx-cat-body"></div>`;
+                    section.querySelector('.porgx-cat-head').addEventListener('click', () => {
+                        data().collapsed[cat] = !data().collapsed[cat];
+                        save();
+                        apply();
+                    });
+                    sh.appendChild(section);
+                }
+                sh.appendChild(section);
+
+                const accent = catColor(cat);
+                section.style.setProperty('--porgx-accent', accent);
+                section.querySelector('.porgx-mono').textContent =
+                    cat === PINNED ? '⭐' : cat.slice(0, 1).toUpperCase();
+                section.querySelector('.porgx-cat-name').textContent = cat;
+                section.querySelector('.porgx-cat-count').textContent = members.length;
+                const collapsed = !!s.collapsed[cat];
+                section.classList.toggle('porgx-collapsed', collapsed);
+                section.querySelector('.porgx-cat-caret').classList.toggle('porgx-rot', collapsed);
+
+                members.sort((a, b) => s.sortAlpha
+                    ? a.name.localeCompare(b.name)
+                    : (originalOrder.get(a.name) ?? 0) - (originalOrder.get(b.name) ?? 0));
+
+                const body = section.querySelector('.porgx-cat-body');
+                for (const d of members) {
+                    decorate(d);
+                    body.appendChild(d.el);
+                }
+            }
+
+            sh.querySelectorAll('.porgx-cat').forEach(sec => {
+                if (!sec.querySelector('.porgx-cat-body > *')) sec.remove();
+            });
+
+            applySearch();
+        } finally {
+            requestAnimationFrame(() => { applying = false; });
+        }
+    }
+
+    function decorate(d) {
+        const header = d.el.querySelector('.inline-drawer-header');
+        if (!header) return;
+        let pin = header.querySelector('.porgx-pin');
+        if (pin) {
+            pin.classList.toggle('porgx-pinned', data().pinned.includes(d.name));
+            const sel = header.querySelector('.porgx-cat-select');
+            if (sel) sel.value = data().cats[d.name] || OTHER;
+            return;
+        }
+
+        pin = document.createElement('span');
+        pin.className = 'porgx-pin fa-solid fa-star';
+        pin.title = 'Pin to top';
+        pin.classList.toggle('porgx-pinned', data().pinned.includes(d.name));
+        pin.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const p = data().pinned;
+            const i = p.indexOf(d.name);
+            i >= 0 ? p.splice(i, 1) : p.push(d.name);
+            save();
+            apply();
+        });
+
+        const sel = document.createElement('select');
+        sel.className = 'porgx-cat-select text_pole';
+        sel.title = 'Assign category';
+        rebuildSelect(sel, d.name);
+        sel.addEventListener('click', e => e.stopPropagation());
+        sel.addEventListener('change', (e) => {
+            e.stopPropagation();
+            const s = data();
+            if (sel.value === '__new__') {
+                const name = prompt('New category name:')?.trim();
+                if (name && !s.customCats.includes(name) && name !== PINNED && name !== OTHER) {
+                    s.customCats.push(name);
+                    s.cats[d.name] = name;
+                }
+                rebuildSelect(sel, d.name);
+            } else if (sel.value === OTHER) {
+                delete s.cats[d.name];
+            } else {
+                s.cats[d.name] = sel.value;
+            }
+            save();
+            apply();
+        });
+
+        header.appendChild(sel);
+        header.appendChild(pin);
+    }
+
+    function rebuildSelect(sel, name) {
+        const s = data();
+        sel.innerHTML = [
+            ...[...s.customCats, OTHER].map(c => `<option value="${c}">${c}</option>`),
+            `<option value="__new__">+ New category…</option>`,
+        ].join('');
+        sel.value = s.cats[name] || OTHER;
+    }
+
+    /* ---------------- search ---------------- */
+
+    function applySearch() {
+        const sh = document.getElementById('porgx_shelf');
+        if (!sh) return;
+        const q = query.trim().toLowerCase();
+        sh.querySelectorAll('.porgx-cat').forEach(sec => {
+            let visible = 0;
+            sec.querySelectorAll('.porgx-cat-body > *').forEach(el => {
+                const match = !q || drawerName(el).toLowerCase().includes(q);
+                el.classList.toggle('porgx-hide', !match);
+                if (match) visible++;
+            });
+            sec.classList.toggle('porgx-hide', visible === 0);
+            if (q && visible > 0) sec.classList.remove('porgx-collapsed');
+            else if (!q) sec.classList.toggle('porgx-collapsed', !!data().collapsed[sec.dataset.porgxCat]);
+        });
+    }
+
+    /* ---------------- toolbar ---------------- */
+
+    function ensureToolbar() {
+        const host = document.getElementById(HOSTS[0]);
+        if (!host || document.getElementById('porgx_toolbar')) return;
+        const bar = document.createElement('div');
+        bar.id = 'porgx_toolbar';
+        bar.innerHTML = `
+            <i class="fa-solid fa-magnifying-glass porgx-tb-icon"></i>
+            <input id="porgx_search" class="text_pole" type="text"
+                   placeholder="Search extensions…" autocomplete="off">
+            <i id="porgx_sort" class="fa-solid fa-arrow-down-a-z porgx-tb-btn"
+               title="Toggle A–Z sorting"></i>
+            <i id="porgx_mode" class="fa-solid fa-sliders porgx-tb-btn"
+               title="Organize mode: show pin and category controls"></i>`;
+        host.prepend(bar);
+
+        const sortBtn = bar.querySelector('#porgx_sort');
+        sortBtn.classList.toggle('porgx-on', data().sortAlpha);
+
+        bar.querySelector('#porgx_search').addEventListener('input', (e) => {
+            query = e.target.value;
+            applySearch();
+        });
+        sortBtn.addEventListener('click', () => {
+            data().sortAlpha = !data().sortAlpha;
+            sortBtn.classList.toggle('porgx-on', data().sortAlpha);
+            save();
+            apply();
+        });
+        bar.querySelector('#porgx_mode').addEventListener('click', (e) => {
+            organizeMode = !organizeMode;
+            e.target.classList.toggle('porgx-on', organizeMode);
+            document.getElementById('porgx_shelf')?.classList.toggle('porgx-organize', organizeMode);
+        });
+    }
+
+    /* ---------------- wiring ---------------- */
+
+    function watch() {
+        for (const id of HOSTS) {
+            const host = document.getElementById(id);
+            if (!host) continue;
+            new MutationObserver(() => {
+                if (applying) return;
+                clearTimeout(watch._t);
+                watch._t = setTimeout(apply, 150);
+            }).observe(host, { childList: true });
+        }
+    }
+
+    function init() {
+        // Delay past the standalone Extension Organizer's init (~800ms) so
+        // detection is reliable, and past most extensions registering drawers.
+        setTimeout(() => {
+            if (standaloneActive()) {
+                console.log('[Preset Organizer] standalone Extension Organizer detected — integrated panel organizer standing down');
+                return;
+            }
+            apply();
+            watch();
+        }, 1300);
     }
 
     if (window.SillyTavern?.getContext) {

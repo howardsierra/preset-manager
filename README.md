@@ -43,6 +43,18 @@ re-parented, so drag-to-reorder, editing, and all native controls keep working.
 - **Section chips** — a colored chip row under the toolbar; click any chip to
   expand and jump straight to that section
 
+### New in 1.3.0
+
+- **Extensions panel organizer, built in** — the Extensions settings panel gets
+  the full treatment: sticky search toolbar, pin favorites (⭐), assignable
+  color-coded categories with collapsible card sections, monogram tiles and
+  count chips, A–Z sorting, and an organize mode that hides the controls for
+  everyday use. Styled like Context Lens: solid navy cards, accent gradients.
+- Shares saved pins/categories with the standalone "Extension Organizer"
+  extension and automatically stands down if it detects the standalone running
+  — but you should disable the standalone and use this one.
+- Toggle it off under Extensions ▸ Preset Organizer (refresh to restore vanilla).
+
 ## Install
 
 Extensions ▸ Install extension ▸ paste this repo's URL.
