@@ -501,6 +501,12 @@
                     </label>
                     <small>Categories, pinning, and search for extension drawers.
                     Refresh the page after turning this off.</small>
+                    <label class="checkbox_label">
+                        <input id="porg_organize_conn" type="checkbox">
+                        <span>Connection panel overhaul (provider chips + model navigator)</span>
+                    </label>
+                    <small>Replaces the source dropdown with tappable chips and adds
+                    a visual model browser. Toggle takes effect immediately.</small>
                 </div>
             </div>`;
         host.appendChild(wrap);
@@ -526,6 +532,18 @@
             save();
             if (typeof toastr !== 'undefined' && !orgExt.checked) {
                 toastr.info('Refresh the page to restore the vanilla Extensions panel', 'Preset Organizer');
+            }
+        });
+
+        const orgConn = wrap.querySelector('#porg_organize_conn');
+        orgConn.checked = settings().organizeConnection !== false;
+        orgConn.addEventListener('change', () => {
+            settings().organizeConnection = orgConn.checked;
+            save();
+            if (!orgConn.checked) {
+                // tear down immediately; the module rebuilds when re-enabled
+                document.getElementById('porgc_chips')?.remove();
+                document.getElementById('chat_completion_source')?.classList.remove('porgc-hide-native');
             }
         });
     }
@@ -1080,6 +1098,217 @@
         eventSource.on(event_types.CHAT_CHANGED, () => setTimeout(render, 250));
 
         ensureBar();
+    }
+
+    if (window.SillyTavern?.getContext) {
+        const { eventSource, event_types } = ctx();
+        eventSource.once(event_types.APP_READY, init);
+        if (document.getElementById('extensionsMenu')) init();
+    }
+})();
+
+/* ====================================================================== */
+/* Connection Panel Overhaul (v1.5.0)                                      */
+/*                                                                         */
+/* NemoPresetExt-style connection UI, mobile-first:                        */
+/*  - Provider chips: a horizontally-scrollable chip row replaces the      */
+/*    Chat Completion Source dropdown (tap to switch; ⤺ restores native)   */
+/*  - Model Navigator: a grid icon next to every model dropdown opens a    */
+/*    searchable card grid with per-source favorites — same modal as the   */
+/*    Preset Navigator                                                     */
+/* ====================================================================== */
+
+(() => {
+    'use strict';
+
+    const HOST = 'presetOrganizer';
+    const PALETTE = ['#8B7CFF', '#FF6B9D', '#FFB347', '#4ECDC4', '#A8E05F', '#FF8C66', '#6FB8FF', '#E07BE0'];
+
+    const ctx = () => SillyTavern.getContext();
+
+    function hs() {
+        const es = ctx().extensionSettings;
+        es[HOST] = es[HOST] || {};
+        if (!es[HOST].modelFavs) es[HOST].modelFavs = {};
+        return es[HOST];
+    }
+
+    const save = () => ctx().saveSettingsDebounced();
+    const enabled = () => hs().organizeConnection !== false;
+
+    const sourceSelect = () => document.getElementById('chat_completion_source');
+
+    function fire(sel) {
+        if (window.jQuery) jQuery(sel).trigger('change');
+        else sel.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    /* ---------------- provider chips ---------------- */
+
+    function buildChips() {
+        const sel = sourceSelect();
+        if (!sel) return;
+
+        if (!enabled()) {
+            document.getElementById('porgc_chips')?.remove();
+            sel.classList.remove('porgc-hide-native');
+            return;
+        }
+
+        let row = document.getElementById('porgc_chips');
+        if (!row) {
+            row = document.createElement('div');
+            row.id = 'porgc_chips';
+            sel.insertAdjacentElement('beforebegin', row);
+        }
+        sel.classList.add('porgc-hide-native');
+
+        const current = sel.value;
+        row.innerHTML = '';
+        [...sel.options].forEach((o, i) => {
+            const chip = document.createElement('span');
+            chip.className = 'porgc-chip' + (o.value === current ? ' porgc-active' : '');
+            chip.style.setProperty('--porg-accent', PALETTE[i % PALETTE.length]);
+            chip.textContent = o.textContent.trim();
+            chip.title = `Switch source to ${o.textContent.trim()}`;
+            chip.addEventListener('click', () => {
+                if (sel.value === o.value) return;
+                sel.value = o.value;
+                fire(sel);
+                buildChips();
+            });
+            row.appendChild(chip);
+        });
+
+        const revert = document.createElement('span');
+        revert.className = 'porgc-chip porgc-revert fa-solid fa-arrow-rotate-left';
+        revert.title = 'Restore the native dropdown';
+        revert.addEventListener('click', () => {
+            hs().organizeConnection = false;
+            save();
+            buildChips();
+            const cb = document.getElementById('porg_organize_conn');
+            if (cb) cb.checked = false;
+        });
+        row.appendChild(revert);
+
+        // keep the active chip in view on narrow screens
+        row.querySelector('.porgc-active')?.scrollIntoView?.({ inline: 'center', block: 'nearest' });
+    }
+
+    /* ---------------- model navigator ---------------- */
+
+    function favBucket(selectId) {
+        const f = hs().modelFavs;
+        f[selectId] = f[selectId] || [];
+        return f[selectId];
+    }
+
+    function addModelButtons() {
+        if (!enabled()) return;
+        document.querySelectorAll('select[id^="model_"]').forEach(sel => {
+            if (document.getElementById(`porgc_btn_${sel.id}`)) return;
+            const btn = document.createElement('i');
+            btn.id = `porgc_btn_${sel.id}`;
+            btn.className = 'fa-solid fa-table-cells-large porg-nav-btn interactable';
+            btn.title = 'Browse models visually';
+            btn.tabIndex = 0;
+            sel.insertAdjacentElement('afterend', btn);
+            btn.addEventListener('click', () => openModelNav(sel));
+        });
+    }
+
+    function closeNav() {
+        document.getElementById('porg_nav')?.remove();
+        document.removeEventListener('keydown', esc);
+    }
+    function esc(e) { if (e.key === 'Escape') closeNav(); }
+
+    function openModelNav(sel) {
+        closeNav();
+        const current = sel.selectedOptions[0]?.textContent.trim();
+        const overlay = document.createElement('div');
+        overlay.id = 'porg_nav';
+        overlay.innerHTML = `
+            <div class="porg-nav-modal">
+                <div class="porg-nav-head">
+                    <i class="fa-solid fa-microchip"></i>
+                    <b>Models</b>
+                    <input id="porg_nav_search" class="text_pole" type="text"
+                           placeholder="Search models…" autocomplete="off">
+                    <span class="porg-nav-close" title="Close">×</span>
+                </div>
+                <div class="porg-nav-grid"></div>
+            </div>`;
+        document.body.appendChild(overlay);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) closeNav(); });
+        overlay.querySelector('.porg-nav-close').addEventListener('click', closeNav);
+        document.addEventListener('keydown', esc);
+
+        const grid = overlay.querySelector('.porg-nav-grid');
+
+        function renderGrid(filter = '') {
+            const favs = new Set(favBucket(sel.id));
+            const q = filter.trim().toLowerCase();
+            const names = [...sel.options].map(o => o.textContent.trim())
+                .filter(n => n && (!q || n.toLowerCase().includes(q)))
+                .sort((a, b) => (favs.has(b) - favs.has(a)) || a.localeCompare(b));
+
+            grid.innerHTML = names.length ? '' : '<div class="porg-nav-empty">No models match.</div>';
+            names.forEach((name, i) => {
+                const accent = PALETTE[i % PALETTE.length];
+                const card = document.createElement('div');
+                card.className = 'porg-nav-card' + (name === current ? ' porg-nav-current' : '');
+                card.style.setProperty('--porg-accent', accent);
+                card.innerHTML = `
+                    <span class="porg-nav-mono">${name.slice(0, 1).toUpperCase()}</span>
+                    <span class="porg-nav-name"></span>
+                    <i class="porg-nav-fav fa-star ${favs.has(name) ? 'fa-solid porg-faved' : 'fa-regular'}"
+                       title="Favorite"></i>`;
+                card.querySelector('.porg-nav-name').textContent = name;
+                card.title = name === current ? `${name} (current)` : `Switch to ${name}`;
+
+                card.querySelector('.porg-nav-fav').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const f = favBucket(sel.id);
+                    const idx = f.indexOf(name);
+                    idx >= 0 ? f.splice(idx, 1) : f.push(name);
+                    save();
+                    renderGrid(filter);
+                });
+
+                card.addEventListener('click', () => {
+                    const opt = [...sel.options].find(o => o.textContent.trim() === name);
+                    if (opt) { sel.value = opt.value; fire(sel); }
+                    closeNav();
+                });
+                grid.appendChild(card);
+            });
+        }
+
+        renderGrid();
+        const search = overlay.querySelector('#porg_nav_search');
+        search.addEventListener('input', () => renderGrid(search.value));
+        search.focus();
+    }
+
+    /* ---------------- wiring ---------------- */
+
+    function syncAll() {
+        try { buildChips(); } catch (e) { console.error('[Preset Organizer] provider chips:', e); }
+        try { addModelButtons(); } catch (e) { console.error('[Preset Organizer] model navigator:', e); }
+    }
+
+    function init() {
+        const { eventSource, event_types } = ctx();
+        syncAll();
+        eventSource.on(event_types.SETTINGS_UPDATED, () => setTimeout(syncAll, 100));
+        // Model selects get repopulated when sources/keys change
+        const target = sourceSelect()?.closest('form') || document.body;
+        new MutationObserver(() => {
+            clearTimeout(init._t);
+            init._t = setTimeout(syncAll, 200);
+        }).observe(target, { childList: true, subtree: true });
     }
 
     if (window.SillyTavern?.getContext) {

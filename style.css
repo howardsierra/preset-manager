@@ -495,3 +495,49 @@ mark.porg-hl {
 @media (prefers-reduced-motion: reduce) {
     .porgl-caret, .porgl-chip { transition: none !important; transform: none !important; }
 }
+
+/* ===== v1.5.0: Connection panel overhaul ===== */
+
+/* provider chips — horizontally scrollable, thumb-sized */
+#porgc_chips {
+    display: flex;
+    gap: 7px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    padding: 6px 2px 8px;
+    margin: 2px 0 4px;
+}
+.porgc-chip {
+    --porg-accent: #8B7CFF;
+    flex: 0 0 auto;
+    cursor: pointer;
+    padding: 8px 15px;            /* comfortable tap height */
+    border-radius: 999px;
+    font-size: .84em;
+    font-weight: 600;
+    white-space: nowrap;
+    background: rgba(255, 255, 255, .05);
+    color: rgba(255, 255, 255, .6);
+    border: 1px solid rgba(255, 255, 255, .13);
+    transition: background .12s, color .12s, border-color .12s;
+}
+.porgc-chip:active { transform: scale(.97); }
+.porgc-chip.porgc-active {
+    background: color-mix(in srgb, var(--porg-accent) 26%, transparent);
+    color: color-mix(in srgb, var(--porg-accent) 68%, white);
+    border-color: color-mix(in srgb, var(--porg-accent) 60%, transparent);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--porg-accent) 30%, transparent);
+}
+.porgc-revert {
+    color: rgba(255, 255, 255, .45);
+    padding: 8px 11px;
+}
+.porgc-revert:hover { color: #fff; }
+
+/* hide the native source dropdown while chips are active */
+select#chat_completion_source.porgc-hide-native { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+    .porgc-chip { transition: none !important; transform: none !important; }
+}

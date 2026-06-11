@@ -65,6 +65,15 @@ re-parented, so drag-to-reorder, editing, and all native controls keep working.
   big tap targets, wraps cleanly on narrow screens, collapsed by default.
   Works standalone too (just chips + count) if LoreLink isn't installed.
 
+### New in 1.5.0
+
+- **Connection panel overhaul** — the Chat Completion Source dropdown becomes a
+  horizontally-scrollable row of tappable provider chips (the active one glows;
+  ⤺ restores the native dropdown). Every model dropdown gets a grid icon that
+  opens the **Model Navigator**: a searchable card grid with per-source
+  favorites — finally usable with OpenRouter's hundreds of models on a phone.
+  Toggle under Extensions ▸ Preset Organizer.
+
 ## Install
 
 Extensions ▸ Install extension ▸ paste this repo's URL.
