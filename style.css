@@ -118,3 +118,156 @@ li.completion_prompt_manager_prompt.porg-search-hide {
 @media (prefers-reduced-motion: reduce) {
     .porg-caret, .porg-tb-btn, .porg-bulk { transition: none !important; }
 }
+
+/* ===== v1.1.0 additions ===================================== */
+
+/* search highlight */
+mark.porg-hl {
+    background: rgba(255, 179, 71, .45);
+    color: inherit;
+    border-radius: 3px;
+    padding: 0 1px;
+}
+
+/* section quick-jump chips */
+#porg_chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin: 0 0 8px;
+}
+#porg_chips.porg-hidden { display: none; }
+.porg-chip {
+    --porg-accent: #8B7CFF;
+    cursor: pointer;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: .78em;
+    font-weight: 600;
+    background: color-mix(in srgb, var(--porg-accent) 16%, transparent);
+    color: color-mix(in srgb, var(--porg-accent) 70%, white);
+    border: 1px solid color-mix(in srgb, var(--porg-accent) 40%, transparent);
+    transition: background .15s, transform .1s;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.porg-chip:hover {
+    background: color-mix(in srgb, var(--porg-accent) 32%, transparent);
+    transform: translateY(-1px);
+}
+
+/* preset navigator button */
+.porg-nav-btn {
+    cursor: pointer;
+    margin-left: 6px;
+    padding: 5px;
+    border-radius: 6px;
+    color: #8B7CFF;
+    opacity: .75;
+    transition: opacity .15s, background .15s;
+}
+.porg-nav-btn:hover { opacity: 1; background: rgba(139, 124, 255, .18); }
+
+/* preset navigator modal */
+#porg_nav {
+    position: fixed;
+    inset: 0;
+    z-index: 5000;
+    background: rgba(8, 9, 13, .6);
+    backdrop-filter: blur(3px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.porg-nav-modal {
+    width: min(680px, 94vw);
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    background: #14161D;
+    color: #E8EAF1;
+    border: 1px solid #2A2E3B;
+    border-radius: 12px;
+    box-shadow: 0 16px 50px rgba(0, 0, 0, .6);
+    overflow: hidden;
+}
+.porg-nav-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: #1B1E28;
+    border-bottom: 1px solid #2A2E3B;
+}
+.porg-nav-head i { color: #8B7CFF; }
+.porg-nav-head input { flex: 1; min-width: 0; }
+.porg-nav-close {
+    cursor: pointer;
+    font-size: 20px;
+    line-height: 1;
+    color: #9AA1B4;
+    padding: 0 4px;
+}
+.porg-nav-close:hover { color: #fff; }
+
+.porg-nav-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 8px;
+    padding: 12px;
+    overflow-y: auto;
+}
+.porg-nav-card {
+    --porg-accent: #8B7CFF;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 10px;
+    border-radius: 9px;
+    cursor: pointer;
+    background: #181B24;
+    border: 1px solid #242837;
+    border-left: 3px solid var(--porg-accent);
+    transition: background .12s, transform .1s, border-color .12s;
+}
+.porg-nav-card:hover {
+    background: color-mix(in srgb, var(--porg-accent) 14%, #181B24);
+    transform: translateY(-1px);
+}
+.porg-nav-current {
+    border-color: var(--porg-accent);
+    background: color-mix(in srgb, var(--porg-accent) 18%, #181B24);
+    box-shadow: 0 0 0 1px var(--porg-accent) inset;
+}
+.porg-nav-mono {
+    flex: 0 0 30px;
+    height: 30px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    background: color-mix(in srgb, var(--porg-accent) 28%, transparent);
+    color: color-mix(in srgb, var(--porg-accent) 70%, white);
+}
+.porg-nav-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: .9em;
+}
+.porg-nav-fav {
+    cursor: pointer;
+    color: rgba(255, 255, 255, .3);
+    transition: color .15s, transform .1s;
+}
+.porg-nav-fav:hover { transform: scale(1.2); }
+.porg-nav-fav.porg-faved { color: #FFD700; }
+.porg-nav-empty { grid-column: 1/-1; opacity: .6; font-style: italic; padding: 16px; text-align: center; }
+
+@media (prefers-reduced-motion: reduce) {
+    .porg-chip, .porg-nav-card, .porg-nav-fav, .porg-nav-btn { transition: none !important; transform: none !important; }
+}

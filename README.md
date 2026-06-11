@@ -27,6 +27,15 @@ The divider pattern is a regex you can change in Extensions ▸ Preset Organizer
 Non-destructive: SillyTavern's own prompt rows are decorated in place, never
 re-parented, so drag-to-reorder, editing, and all native controls keep working.
 
+### New in 1.1.0
+
+- **Preset Navigator** — a grid-style preset browser. Click the grid icon next
+  to the preset dropdown to search, favorite (⭐ floats to top), and switch
+  presets visually; the current preset is highlighted
+- **Search highlighting** — matching text lights up in amber as you type
+- **Section chips** — a colored chip row under the toolbar; click any chip to
+  expand and jump straight to that section
+
 ## Install
 
 Extensions ▸ Install extension ▸ paste this repo's URL.

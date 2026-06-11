@@ -46,9 +46,10 @@
 
     function settings() {
         const es = ctx().extensionSettings;
-        es[MODULE] = es[MODULE] || { pattern: DEFAULT_PATTERN, collapsed: {} };
+        es[MODULE] = es[MODULE] || { pattern: DEFAULT_PATTERN, collapsed: {}, favorites: [] };
         if (typeof es[MODULE].pattern !== 'string') es[MODULE].pattern = DEFAULT_PATTERN;
         if (!es[MODULE].collapsed) es[MODULE].collapsed = {};
+        if (!Array.isArray(es[MODULE].favorites)) es[MODULE].favorites = [];
         return es[MODULE];
     }
 
@@ -129,10 +130,12 @@
 
             const sections = scanSections();
             const collapsedMap = settings().collapsed[presetKey()] || {};
+            const chips = [];
 
             sections.forEach((sec, i) => {
                 const li = sec.headerLi;
                 const accent = PALETTE[i % PALETTE.length];
+                chips.push({ title: sec.title, accent, id: sec.id, headerLi: li });
                 li.classList.add('porg-header');
                 li.style.setProperty('--porg-accent', accent);
                 const collapsed = !!collapsedMap[sec.id];
@@ -180,6 +183,8 @@
                 }
             });
 
+            renderChips(chips);
+            addNavButton();
             applySearch();
         } finally {
             // Let the mutation queue flush before re-arming
@@ -231,6 +236,23 @@
 
     let query = '';
 
+    /** Highlight the query inside a prompt's name anchor (reversible). */
+    function highlight(li, q) {
+        const a = li.querySelector('.completion_prompt_manager_prompt_name a');
+        if (!a) return;
+        if (!a.dataset.porgName) a.dataset.porgName = a.textContent;
+        const name = a.dataset.porgName;
+        if (!q) { a.textContent = name; return; }
+        const i = name.toLowerCase().indexOf(q);
+        if (i < 0) { a.textContent = name; return; }
+        a.textContent = '';
+        a.append(
+            document.createTextNode(name.slice(0, i)),
+            Object.assign(document.createElement('mark'), { className: 'porg-hl', textContent: name.slice(i, i + q.length) }),
+            document.createTextNode(name.slice(i + q.length)),
+        );
+    }
+
     function applySearch() {
         const list = listEl();
         if (!list) return;
@@ -238,7 +260,7 @@
         const items = [...list.querySelectorAll('li.completion_prompt_manager_prompt')];
 
         if (!q) {
-            items.forEach(li => li.classList.remove('porg-search-hide'));
+            items.forEach(li => { li.classList.remove('porg-search-hide'); highlight(li, ''); });
             return;
         }
         // While searching: show matching prompts and any header whose section
@@ -246,7 +268,9 @@
         const sections = scanSections();
         const visible = new Set();
         for (const li of items) {
-            if (promptName(li).toLowerCase().includes(q)) visible.add(li);
+            const match = promptName(li).toLowerCase().includes(q);
+            highlight(li, match ? q : '');
+            if (match) visible.add(li);
         }
         for (const sec of sections) {
             if (sec.members.some(m => visible.has(m)) || visible.has(sec.headerLi)) {
@@ -257,6 +281,143 @@
             li.classList.toggle('porg-search-hide', !visible.has(li));
             if (visible.has(li)) li.classList.remove('porg-collapsed-hide');
         }
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Section quick-jump chips                                            */
+    /* ------------------------------------------------------------------ */
+
+    function renderChips(chips) {
+        let row = document.getElementById('porg_chips');
+        if (!row) {
+            const bar = document.getElementById('porg_toolbar');
+            if (!bar) return;
+            row = document.createElement('div');
+            row.id = 'porg_chips';
+            bar.insertAdjacentElement('afterend', row);
+        }
+        row.innerHTML = '';
+        row.classList.toggle('porg-hidden', chips.length === 0);
+        for (const c of chips) {
+            const chip = document.createElement('span');
+            chip.className = 'porg-chip';
+            chip.style.setProperty('--porg-accent', c.accent);
+            chip.textContent = c.title;
+            chip.title = `Jump to "${c.title}"`;
+            chip.addEventListener('click', () => {
+                // Expand if collapsed, then scroll to the header
+                const map = settings().collapsed;
+                const key = presetKey();
+                if (map[key]?.[c.id]) {
+                    map[key][c.id] = false;
+                    save();
+                    apply();
+                }
+                document.querySelector(`li.porg-header[data-pm-identifier="${CSS.escape(c.id)}"]`)
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+            row.appendChild(chip);
+        }
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Preset Navigator — visual browser for chat completion presets       */
+    /* ------------------------------------------------------------------ */
+
+    const presetSelect = () => document.getElementById('settings_preset_openai');
+
+    function addNavButton() {
+        const sel = presetSelect();
+        if (!sel || document.getElementById('porg_nav_btn')) return;
+        const btn = document.createElement('i');
+        btn.id = 'porg_nav_btn';
+        btn.className = 'fa-solid fa-table-cells-large porg-nav-btn interactable';
+        btn.title = 'Browse presets visually';
+        btn.tabIndex = 0;
+        sel.insertAdjacentElement('afterend', btn);
+        btn.addEventListener('click', openNavigator);
+    }
+
+    function closeNavigator() {
+        document.getElementById('porg_nav')?.remove();
+        document.removeEventListener('keydown', navEsc);
+    }
+
+    function navEsc(e) { if (e.key === 'Escape') closeNavigator(); }
+
+    function openNavigator() {
+        closeNavigator();
+        const sel = presetSelect();
+        if (!sel) return;
+        const current = sel.selectedOptions[0]?.textContent.trim();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'porg_nav';
+        overlay.innerHTML = `
+            <div class="porg-nav-modal">
+                <div class="porg-nav-head">
+                    <i class="fa-solid fa-table-cells-large"></i>
+                    <b>Presets</b>
+                    <input id="porg_nav_search" class="text_pole" type="text"
+                           placeholder="Search presets…" autocomplete="off">
+                    <span class="porg-nav-close" title="Close">×</span>
+                </div>
+                <div class="porg-nav-grid"></div>
+            </div>`;
+        document.body.appendChild(overlay);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) closeNavigator(); });
+        overlay.querySelector('.porg-nav-close').addEventListener('click', closeNavigator);
+        document.addEventListener('keydown', navEsc);
+
+        const grid = overlay.querySelector('.porg-nav-grid');
+
+        function renderGrid(filter = '') {
+            const favs = new Set(settings().favorites);
+            const q = filter.trim().toLowerCase();
+            const names = [...sel.options].map(o => o.textContent.trim())
+                .filter(n => !q || n.toLowerCase().includes(q))
+                .sort((a, b) => (favs.has(b) - favs.has(a)) || a.localeCompare(b));
+
+            grid.innerHTML = names.length ? '' : '<div class="porg-nav-empty">No presets match.</div>';
+            names.forEach((name, i) => {
+                const accent = PALETTE[i % PALETTE.length];
+                const card = document.createElement('div');
+                card.className = 'porg-nav-card' + (name === current ? ' porg-nav-current' : '');
+                card.style.setProperty('--porg-accent', accent);
+                card.innerHTML = `
+                    <span class="porg-nav-mono">${name.slice(0, 1).toUpperCase()}</span>
+                    <span class="porg-nav-name"></span>
+                    <i class="porg-nav-fav fa-star ${favs.has(name) ? 'fa-solid porg-faved' : 'fa-regular'}"
+                       title="Favorite"></i>`;
+                card.querySelector('.porg-nav-name').textContent = name;
+                card.title = name === current ? `${name} (current)` : `Switch to "${name}"`;
+
+                card.querySelector('.porg-nav-fav').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const f = settings().favorites;
+                    const idx = f.indexOf(name);
+                    idx >= 0 ? f.splice(idx, 1) : f.push(name);
+                    save();
+                    renderGrid(filter);
+                });
+
+                card.addEventListener('click', () => {
+                    const opt = [...sel.options].find(o => o.textContent.trim() === name);
+                    if (opt) {
+                        sel.value = opt.value;
+                        if (window.jQuery) jQuery(sel).trigger('change');
+                        else sel.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                    closeNavigator();
+                });
+                grid.appendChild(card);
+            });
+        }
+
+        renderGrid();
+        const search = overlay.querySelector('#porg_nav_search');
+        search.addEventListener('input', () => renderGrid(search.value));
+        search.focus();
     }
 
     /* ------------------------------------------------------------------ */
