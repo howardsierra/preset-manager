@@ -1317,3 +1317,194 @@
         if (document.getElementById('extensionsMenu')) init();
     }
 })();
+
+/* ====================================================================== */
+/* Custom Proxy Manager (v1.6.0)                                           */
+/*                                                                         */
+/* Save multiple custom OpenAI-compatible endpoints and switch with a tap. */
+/* A horizontal card row appears under the source selector whenever the    */
+/* "custom" chat completion source is active. Applying a card fills the    */
+/* endpoint URL + API key and auto-clicks Connect to fetch its models      */
+/* (same mechanism NemoPresetExt uses).                                    */
+/*                                                                         */
+/* ⚠ Keys are stored in SillyTavern's settings in plaintext — identical    */
+/* to NemoPresetExt and ST's own reverse-proxy presets. Don't use this on  */
+/* a shared/hosted ST instance you don't trust.                            */
+/* ====================================================================== */
+
+(() => {
+    'use strict';
+
+    const HOST = 'presetOrganizer';
+    const ctx = () => SillyTavern.getContext();
+
+    function hs() {
+        const es = ctx().extensionSettings;
+        es[HOST] = es[HOST] || {};
+        if (!Array.isArray(es[HOST].customProxies)) es[HOST].customProxies = [];
+        return es[HOST];
+    }
+
+    const proxies = () => hs().customProxies;
+    const save = () => ctx().saveSettingsDebounced();
+    const uid = () => 'pxy_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+    const sourceSelect = () => document.getElementById('chat_completion_source');
+    const isCustom = () => sourceSelect()?.value === 'custom';
+
+    /* ---------------- applying a proxy ---------------- */
+
+    function fireInput(el) {
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    function applyProxy(p) {
+        const url = document.getElementById('custom_api_url_text');
+        if (url) { url.value = p.url; fireInput(url); }
+
+        const key = document.getElementById('api_key_custom');
+        if (key && p.key) { key.value = p.key; fireInput(key); }
+
+        for (const q of proxies()) q.active = (q.id === p.id);
+        save();
+        render();
+
+        // let ST persist the fields, then connect to fetch this endpoint's models
+        setTimeout(() => document.getElementById('api_button_openai')?.click?.(), 300);
+        if (typeof toastr !== 'undefined') toastr.info(p.url, `Connecting: ${p.name}`, { timeOut: 3000 });
+    }
+
+    /* ---------------- UI ---------------- */
+
+    let formOpenFor = null; // null = closed, '' = new, id = editing
+
+    function ensureRow() {
+        const sel = sourceSelect();
+        if (!sel) return null;
+        let wrap = document.getElementById('porgp_wrap');
+        if (!wrap) {
+            wrap = document.createElement('div');
+            wrap.id = 'porgp_wrap';
+            wrap.innerHTML = `
+                <div class="porgp-label"><i class="fa-solid fa-server"></i> Saved proxies</div>
+                <div class="porgp-row" id="porgp_row"></div>
+                <div class="porgp-form porgp-hidden" id="porgp_form">
+                    <input id="porgp_name" class="text_pole" type="text" placeholder="Name (e.g. My proxy)">
+                    <input id="porgp_url" class="text_pole" type="text" placeholder="Endpoint URL (…/v1)">
+                    <input id="porgp_key" class="text_pole" type="password" placeholder="API key (optional, stored in plaintext)">
+                    <div class="porgp-form-btns">
+                        <div class="menu_button" id="porgp_save"><i class="fa-solid fa-check"></i> Save</div>
+                        <div class="menu_button" id="porgp_cancel">Cancel</div>
+                    </div>
+                </div>`;
+            // place right after the provider chips row when present, else after the select
+            const anchor = document.getElementById('porgc_chips') || sel;
+            anchor.insertAdjacentElement('afterend', wrap);
+
+            wrap.querySelector('#porgp_save').addEventListener('click', () => {
+                const name = wrap.querySelector('#porgp_name').value.trim();
+                const url = wrap.querySelector('#porgp_url').value.trim();
+                const key = wrap.querySelector('#porgp_key').value;
+                if (!name || !url) {
+                    if (typeof toastr !== 'undefined') toastr.warning('Name and URL are required', 'Proxy Manager');
+                    return;
+                }
+                if (formOpenFor) {
+                    const p = proxies().find(p => p.id === formOpenFor);
+                    if (p) Object.assign(p, { name, url, key });
+                } else {
+                    proxies().push({ id: uid(), name, url, key, active: false });
+                }
+                formOpenFor = null;
+                save();
+                render();
+            });
+            wrap.querySelector('#porgp_cancel').addEventListener('click', () => {
+                formOpenFor = null;
+                render();
+            });
+        }
+        return wrap;
+    }
+
+    function openForm(id) {
+        formOpenFor = id ?? '';
+        const wrap = document.getElementById('porgp_wrap');
+        const p = id ? proxies().find(p => p.id === id) : null;
+        wrap.querySelector('#porgp_name').value = p?.name ?? '';
+        wrap.querySelector('#porgp_url').value = p?.url ?? '';
+        wrap.querySelector('#porgp_key').value = p?.key ?? '';
+        wrap.querySelector('#porgp_form').classList.remove('porgp-hidden');
+        wrap.querySelector('#porgp_name').focus();
+    }
+
+    function render() {
+        const wrap = ensureRow();
+        if (!wrap) return;
+        wrap.classList.toggle('porgp-hidden', !isCustom());
+        if (!isCustom()) return;
+
+        wrap.querySelector('#porgp_form').classList.toggle('porgp-hidden', formOpenFor === null);
+
+        const row = wrap.querySelector('#porgp_row');
+        row.innerHTML = '';
+        for (const p of proxies()) {
+            const card = document.createElement('div');
+            card.className = 'porgp-card' + (p.active ? ' porgp-active' : '');
+            card.innerHTML = `
+                <span class="porgp-dot"></span>
+                <span class="porgp-name"></span>
+                <span class="porgp-url"></span>
+                <span class="porgp-actions">
+                    <i class="fa-solid fa-pencil porgp-edit" title="Edit"></i>
+                    <i class="fa-solid fa-trash-can porgp-del" title="Delete"></i>
+                </span>`;
+            card.querySelector('.porgp-name').textContent = p.name;
+            card.querySelector('.porgp-url').textContent = p.url.replace(/^https?:\/\//, '');
+            card.title = p.active ? `${p.name} (connected)` : `Tap to connect to ${p.name}`;
+
+            card.addEventListener('click', () => applyProxy(p));
+            card.querySelector('.porgp-edit').addEventListener('click', (e) => {
+                e.stopPropagation();
+                openForm(p.id);
+            });
+            card.querySelector('.porgp-del').addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (typeof window.confirm === 'function' && !window.confirm(`Delete proxy "${p.name}"?`)) return;
+                hs().customProxies = proxies().filter(q => q.id !== p.id);
+                save();
+                render();
+            });
+            row.appendChild(card);
+        }
+
+        /* add-new card */
+        const add = document.createElement('div');
+        add.className = 'porgp-card porgp-add';
+        add.innerHTML = `<i class="fa-solid fa-plus"></i><span>Add proxy</span>`;
+        add.addEventListener('click', () => openForm(null));
+        row.appendChild(add);
+    }
+
+    /* ---------------- wiring ---------------- */
+
+    function init() {
+        const { eventSource, event_types } = ctx();
+        render();
+        const sel = sourceSelect();
+        if (sel) sel.addEventListener('change', () => setTimeout(render, 100));
+        eventSource.on(event_types.SETTINGS_UPDATED, () => setTimeout(render, 150));
+        const target = sel?.closest('form') || document.body;
+        new MutationObserver(() => {
+            clearTimeout(init._t);
+            init._t = setTimeout(render, 250);
+        }).observe(target, { childList: true, subtree: true });
+    }
+
+    if (window.SillyTavern?.getContext) {
+        const { eventSource, event_types } = ctx();
+        eventSource.once(event_types.APP_READY, init);
+        if (document.getElementById('extensionsMenu')) init();
+    }
+})();

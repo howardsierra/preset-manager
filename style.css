@@ -541,3 +541,132 @@ select#chat_completion_source.porgc-hide-native { display: none !important; }
 @media (prefers-reduced-motion: reduce) {
     .porgc-chip { transition: none !important; transform: none !important; }
 }
+
+/* ===== v1.6.0: Custom Proxy Manager ===== */
+
+#porgp_wrap { margin: 4px 0 8px; }
+.porgp-hidden { display: none !important; }
+
+.porgp-label {
+    font-size: .78em;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: #8A93A6;
+    margin: 2px 2px 6px;
+}
+.porgp-label i { color: #4ECDC4; margin-right: 5px; }
+
+/* card row — horizontal scroll on phones */
+.porgp-row {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    padding-bottom: 6px;
+}
+
+.porgp-card {
+    flex: 0 0 auto;
+    width: 168px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas: "dot name" "url url" "actions actions";
+    align-items: center;
+    gap: 2px 7px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    background: #14161D;
+    border: 1px solid #2A2E3B;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .3);
+    transition: border-color .12s, background .12s;
+}
+.porgp-card:active { transform: scale(.98); }
+.porgp-card.porgp-active {
+    border-color: #4ECDC4;
+    background: color-mix(in srgb, #4ECDC4 10%, #14161D);
+    box-shadow: 0 0 0 1px #4ECDC4 inset, 0 4px 12px rgba(0, 0, 0, .3);
+}
+
+.porgp-dot {
+    grid-area: dot;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .18);
+}
+.porgp-active .porgp-dot {
+    background: #4ECDC4;
+    animation: porgp-pulse 2s ease-in-out infinite;
+}
+@keyframes porgp-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(78, 205, 196, .5); }
+    50% { box-shadow: 0 0 0 5px rgba(78, 205, 196, 0); }
+}
+
+.porgp-name {
+    grid-area: name;
+    font-weight: 700;
+    font-size: .86em;
+    color: #E8EAF1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.porgp-url {
+    grid-area: url;
+    font-size: .72em;
+    color: #8A93A6;
+    font-family: var(--monoFontFamily, monospace);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.porgp-actions {
+    grid-area: actions;
+    display: flex;
+    gap: 14px;
+    margin-top: 5px;
+}
+.porgp-actions i {
+    padding: 4px;                  /* tap-friendly */
+    color: rgba(255, 255, 255, .35);
+    transition: color .12s;
+}
+.porgp-actions i:hover { color: #E8EAF1; }
+.porgp-actions .porgp-del:hover { color: #FF6B6B; }
+
+.porgp-add {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    color: #8A93A6;
+    border-style: dashed;
+    font-size: .82em;
+    font-weight: 600;
+    min-height: 74px;
+}
+.porgp-add:hover { color: #4ECDC4; border-color: #4ECDC4; }
+.porgp-add i { font-size: 1.2em; }
+
+/* add/edit form — stacked full-width inputs for phones */
+.porgp-form {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    padding: 12px;
+    margin-top: 6px;
+    background: #14161D;
+    border: 1px solid #2A2E3B;
+    border-radius: 10px;
+}
+.porgp-form-btns { display: flex; gap: 8px; }
+
+@media (prefers-reduced-motion: reduce) {
+    .porgp-card { transition: none !important; transform: none !important; }
+    .porgp-active .porgp-dot { animation: none; }
+}

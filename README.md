@@ -74,6 +74,18 @@ re-parented, so drag-to-reorder, editing, and all native controls keep working.
   favorites — finally usable with OpenRouter's hundreds of models on a phone.
   Toggle under Extensions ▸ Preset Organizer.
 
+### New in 1.6.0
+
+- **Custom Proxy Manager** — save multiple custom OpenAI-compatible endpoints
+  and switch with one tap. When the "Custom" source is active, a horizontal
+  card row appears: each card shows the proxy's name and URL with a pulsing
+  teal dot on the connected one. Tapping a card fills the endpoint URL and
+  API key and auto-clicks Connect to fetch that endpoint's models. Edit and
+  delete per card; the add form is stacked full-width for phones.
+- ⚠ Saved keys live in SillyTavern's settings in plaintext (same as
+  NemoPresetExt and ST's reverse-proxy presets) — avoid on shared/hosted
+  instances you don't fully trust.
+
 ## Install
 
 Extensions ▸ Install extension ▸ paste this repo's URL.
