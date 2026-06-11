@@ -401,3 +401,97 @@ mark.porg-hl {
 @media (prefers-reduced-motion: reduce) {
     .porgx-cat-caret, .porgx-tb-btn, .porgx-pin { transition: none !important; transform: none !important; }
 }
+
+/* ===== v1.4.0: Quick Lorebook Access (mobile-first) ===== */
+
+#porgl_bar {
+    background: #14161D;
+    border: 1px solid #2A2E3B;
+    border-radius: 10px;
+    margin: 0 0 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .3);
+}
+
+.porgl-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;          /* generous tap target */
+    min-height: 40px;
+    cursor: pointer;
+    user-select: none;
+    background: linear-gradient(90deg, rgba(255, 179, 71, .18), #1B1E28 70%);
+    color: #E8EAF1;
+    font-weight: 700;
+}
+.porgl-icon { color: #FFB347; }
+.porgl-title { letter-spacing: .02em; }
+.porgl-count {
+    padding: 1px 9px;
+    border-radius: 999px;
+    font-size: .72em;
+    font-weight: 600;
+    background: rgba(255, 179, 71, .2);
+    color: #FFD08A;
+    border: 1px solid rgba(255, 179, 71, .4);
+}
+
+.porgl-status { font-size: .75em; font-weight: 600; margin-left: auto; }
+.porgl-status.ok { color: #7FE7A0; }
+.porgl-status.warn { color: #FFB347; }
+
+.porgl-sync {
+    font-size: .78em;
+    padding: 4px 10px;            /* big enough for thumbs */
+    white-space: nowrap;
+}
+.porgl-hidden { display: none !important; }
+
+.porgl-caret {
+    font-size: .8em;
+    color: #FFB347;
+    transition: transform .18s ease;
+    padding: 4px;                 /* widen the tap area */
+}
+.porgl-caret.porgl-rot { transform: rotate(-90deg); }
+
+/* chips — wrap freely, sized for touch */
+.porgl-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    padding: 10px 12px;
+    background: #181B24;
+}
+#porgl_bar:not(.porgl-open) .porgl-chips { display: none; }
+
+.porgl-chip {
+    cursor: pointer;
+    padding: 7px 14px;            /* ≥32px touch height */
+    border-radius: 999px;
+    font-size: .82em;
+    font-weight: 600;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    background: rgba(255, 255, 255, .05);
+    color: rgba(255, 255, 255, .55);
+    border: 1px solid rgba(255, 255, 255, .12);
+    transition: background .12s, color .12s, border-color .12s;
+}
+.porgl-chip:active { transform: scale(.97); }
+.porgl-chip.porgl-on {
+    background: rgba(255, 179, 71, .22);
+    color: #FFD08A;
+    border-color: rgba(255, 179, 71, .55);
+}
+/* in the character's LoreLink profile: teal underline marker */
+.porgl-chip.porgl-profiled { box-shadow: inset 0 -2px 0 #4ECDC4; }
+
+.porgl-empty { opacity: .6; font-style: italic; padding: 4px; }
+
+@media (prefers-reduced-motion: reduce) {
+    .porgl-caret, .porgl-chip { transition: none !important; transform: none !important; }
+}

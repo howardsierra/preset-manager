@@ -889,3 +889,202 @@
         if (document.getElementById('extensionsMenu')) init();
     }
 })();
+
+/* ====================================================================== */
+/* Quick Lorebook Access (v1.4.0)                                          */
+/*                                                                         */
+/* A compact, mobile-friendly lorebook bar inside the prompt manager:      */
+/* tap chips to toggle global lorebooks without leaving the panel.         */
+/* If LoreLink is installed, shows the current character's profile status  */
+/* (match / mismatch) with a one-tap Sync button.                          */
+/* ====================================================================== */
+
+(() => {
+    'use strict';
+
+    const HOST = 'presetOrganizer';
+    const ctx = () => SillyTavern.getContext();
+
+    function hostSettings() {
+        const es = ctx().extensionSettings;
+        es[HOST] = es[HOST] || {};
+        if (typeof es[HOST].quickLoreOpen !== 'boolean') es[HOST].quickLoreOpen = false;
+        return es[HOST];
+    }
+
+    function save() { ctx().saveSettingsDebounced(); }
+
+    /* ---------------- world info plumbing (same canonical path LoreLink uses) */
+
+    const worldSelect = () => document.getElementById('world_info');
+
+    function allWorlds() {
+        const sel = worldSelect();
+        return sel ? [...sel.options].map(o => o.textContent.trim()).filter(Boolean) : [];
+    }
+
+    function activeWorlds() {
+        const sel = worldSelect();
+        return sel ? [...sel.selectedOptions].map(o => o.textContent.trim()) : [];
+    }
+
+    function setActiveWorlds(names) {
+        const sel = worldSelect();
+        if (!sel) return;
+        const want = new Set(names);
+        for (const o of sel.options) o.selected = want.has(o.textContent.trim());
+        if (window.jQuery) jQuery(sel).trigger('change');
+        else sel.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    function toggleWorld(name) {
+        const act = activeWorlds();
+        const i = act.indexOf(name);
+        i >= 0 ? act.splice(i, 1) : act.push(name);
+        setActiveWorlds(act);
+    }
+
+    /* ---------------- LoreLink integration (soft dependency) */
+
+    function charKey() {
+        const c = ctx();
+        if (c.groupId) return `group:${c.groupId}`;
+        const ch = c.characters?.[c.characterId];
+        return ch ? `char:${ch.avatar || ch.name}` : null;
+    }
+
+    /** @returns {null | {books: string[], mismatch: boolean, mode: string}} */
+    function loreLinkProfile() {
+        const ll = ctx().extensionSettings?.loreLink;
+        if (!ll?.profiles) return null;              // LoreLink not installed
+        const key = charKey();
+        const profile = key ? ll.profiles[key] : null;
+        if (!Array.isArray(profile)) return null;    // no profile for this character
+        const existing = new Set(allWorlds());
+        const books = profile.filter(w => existing.has(w));
+        const active = activeWorlds();
+        const mode = ll.mode === 'additive' ? 'additive' : 'strict';
+        const mismatch = mode === 'additive'
+            ? books.some(w => !active.includes(w))
+            : (books.length !== active.length || books.some(w => !active.includes(w)));
+        return { books, mismatch, mode };
+    }
+
+    function syncToProfile() {
+        const p = loreLinkProfile();
+        if (!p) return;
+        setActiveWorlds(p.mode === 'additive'
+            ? [...new Set([...activeWorlds(), ...p.books])]
+            : p.books);
+        render();
+    }
+
+    /* ---------------- UI */
+
+    function ensureBar() {
+        const list = document.getElementById('completion_prompt_manager_list');
+        if (!list || document.getElementById('porgl_bar')) return;
+        const bar = document.createElement('div');
+        bar.id = 'porgl_bar';
+        bar.innerHTML = `
+            <div class="porgl-head">
+                <i class="fa-solid fa-book-atlas porgl-icon"></i>
+                <span class="porgl-title">Lorebooks</span>
+                <span class="porgl-count"></span>
+                <span class="porgl-status"></span>
+                <span class="porgl-sync menu_button porgl-hidden">
+                    <i class="fa-solid fa-rotate"></i> Sync
+                </span>
+                <span class="porgl-caret fa-solid fa-chevron-down"></span>
+            </div>
+            <div class="porgl-chips"></div>`;
+        list.parentElement.insertBefore(bar, list);
+
+        bar.querySelector('.porgl-head').addEventListener('click', (e) => {
+            if (e.target.closest('.porgl-sync')) return;
+            const s = hostSettings();
+            s.quickLoreOpen = !s.quickLoreOpen;
+            save();
+            render();
+        });
+        bar.querySelector('.porgl-sync').addEventListener('click', (e) => {
+            e.stopPropagation();
+            syncToProfile();
+        });
+
+        render();
+    }
+
+    function render() {
+        const bar = document.getElementById('porgl_bar');
+        if (!bar) return;
+        const open = hostSettings().quickLoreOpen;
+        const active = new Set(activeWorlds());
+        const profile = loreLinkProfile();
+
+        bar.classList.toggle('porgl-open', open);
+        bar.querySelector('.porgl-caret').classList.toggle('porgl-rot', !open);
+        bar.querySelector('.porgl-count').textContent = `${active.size} active`;
+
+        /* LoreLink status pill */
+        const status = bar.querySelector('.porgl-status');
+        const sync = bar.querySelector('.porgl-sync');
+        if (profile) {
+            status.textContent = profile.mismatch ? 'profile mismatch' : 'profile ✓';
+            status.className = `porgl-status ${profile.mismatch ? 'warn' : 'ok'}`;
+            sync.classList.toggle('porgl-hidden', !profile.mismatch);
+        } else {
+            status.textContent = '';
+            status.className = 'porgl-status';
+            sync.classList.add('porgl-hidden');
+        }
+
+        /* chips */
+        const chips = bar.querySelector('.porgl-chips');
+        chips.innerHTML = '';
+        if (!open) return;
+        const worlds = allWorlds();
+        if (!worlds.length) {
+            chips.innerHTML = '<span class="porgl-empty">No lorebooks yet.</span>';
+            return;
+        }
+        const inProfile = new Set(profile?.books ?? []);
+        for (const w of worlds) {
+            const chip = document.createElement('span');
+            chip.className = 'porgl-chip'
+                + (active.has(w) ? ' porgl-on' : '')
+                + (inProfile.has(w) ? ' porgl-profiled' : '');
+            chip.textContent = w;
+            chip.title = (active.has(w) ? 'Active — tap to disable' : 'Inactive — tap to enable')
+                + (inProfile.has(w) ? ' · in this character\'s LoreLink profile' : '');
+            chip.addEventListener('click', () => { toggleWorld(w); render(); });
+            chips.appendChild(chip);
+        }
+    }
+
+    /* ---------------- wiring */
+
+    function init() {
+        const { eventSource, event_types } = ctx();
+
+        // The prompt manager re-renders constantly; recreate/refresh the bar
+        const target = document.getElementById('completion_prompt_manager') || document.body;
+        new MutationObserver(() => {
+            clearTimeout(init._t);
+            init._t = setTimeout(() => { ensureBar(); render(); }, 100);
+        }).observe(target, { childList: true, subtree: true });
+
+        const sel = worldSelect();
+        if (sel) sel.addEventListener('change', () => setTimeout(render, 50));
+
+        eventSource.on(event_types.CHAT_CHANGED, () => setTimeout(render, 250));
+
+        ensureBar();
+    }
+
+    if (window.SillyTavern?.getContext) {
+        const { eventSource, event_types } = ctx();
+        eventSource.once(event_types.APP_READY, init);
+        if (document.getElementById('extensionsMenu')) init();
+    }
+})();

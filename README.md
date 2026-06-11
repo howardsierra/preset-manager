@@ -55,6 +55,16 @@ re-parented, so drag-to-reorder, editing, and all native controls keep working.
   — but you should disable the standalone and use this one.
 - Toggle it off under Extensions ▸ Preset Organizer (refresh to restore vanilla).
 
+### New in 1.4.0
+
+- **Quick Lorebook Access** — a compact, collapsible bar inside the prompt
+  manager. Tap chips to toggle global lorebooks without leaving the panel;
+  amber = active, and a teal underline marks books in the current character's
+  LoreLink profile. If LoreLink is installed, the header shows profile ✓ or
+  a mismatch warning with a one-tap **Sync** button. Built mobile-first:
+  big tap targets, wraps cleanly on narrow screens, collapsed by default.
+  Works standalone too (just chips + count) if LoreLink isn't installed.
+
 ## Install
 
 Extensions ▸ Install extension ▸ paste this repo's URL.
