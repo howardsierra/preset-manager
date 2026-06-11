@@ -32,6 +32,13 @@ re-parented, so drag-to-reorder, editing, and all native controls keep working.
 - **Preset Navigator** — a grid-style preset browser. Click the grid icon next
   to the preset dropdown to search, favorite (⭐ floats to top), and switch
   presets visually; the current preset is highlighted
+
+### New in 1.2.0
+
+- **Navigator covers every API** — browse buttons now appear next to all four
+  of SillyTavern's preset dropdowns: Chat Completion (OpenAI, Claude, Google,
+  Mistral, Cohere, Scale, AI21, OpenRouter, …), KoboldAI, NovelAI, and Text
+  Completion (TextGen WebUI, Tabby, …). Favorites are saved per API.
 - **Search highlighting** — matching text lights up in amber as you type
 - **Section chips** — a colored chip row under the toolbar; click any chip to
   expand and jump straight to that section

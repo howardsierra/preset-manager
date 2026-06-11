@@ -184,7 +184,7 @@
             });
 
             renderChips(chips);
-            addNavButton();
+            addNavButtons();
             applySearch();
         } finally {
             // Let the mutation queue flush before re-arming
@@ -321,21 +321,45 @@
     }
 
     /* ------------------------------------------------------------------ */
-    /* Preset Navigator — visual browser for chat completion presets       */
+    /* Preset Navigator — visual browser for every preset dropdown          */
     /* ------------------------------------------------------------------ */
 
-    const presetSelect = () => document.getElementById('settings_preset_openai');
+    /**
+     * SillyTavern funnels all APIs into four preset selects:
+     *  - settings_preset_openai: Chat Completion (OpenAI, Claude, Google,
+     *    Mistral, Cohere, Scale, AI21, OpenRouter, …)
+     *  - settings_preset: KoboldAI
+     *  - settings_preset_novel: NovelAI
+     *  - settings_preset_textgenerationwebui: Text Completion (WebUI, Tabby, …)
+     */
+    const PRESET_SELECTS = [
+        { id: 'settings_preset_openai', label: 'Chat Completion' },
+        { id: 'settings_preset', label: 'KoboldAI' },
+        { id: 'settings_preset_novel', label: 'NovelAI' },
+        { id: 'settings_preset_textgenerationwebui', label: 'Text Completion' },
+    ];
 
-    function addNavButton() {
-        const sel = presetSelect();
-        if (!sel || document.getElementById('porg_nav_btn')) return;
-        const btn = document.createElement('i');
-        btn.id = 'porg_nav_btn';
-        btn.className = 'fa-solid fa-table-cells-large porg-nav-btn interactable';
-        btn.title = 'Browse presets visually';
-        btn.tabIndex = 0;
-        sel.insertAdjacentElement('afterend', btn);
-        btn.addEventListener('click', openNavigator);
+    /** favorites are stored per preset-select so names can't collide. */
+    function favBucket(selectId) {
+        const s = settings();
+        // migrate v1.1.0 flat array → keyed object
+        if (Array.isArray(s.favorites)) s.favorites = { settings_preset_openai: s.favorites };
+        s.favorites[selectId] = s.favorites[selectId] || [];
+        return s.favorites[selectId];
+    }
+
+    function addNavButtons() {
+        for (const { id, label } of PRESET_SELECTS) {
+            const sel = document.getElementById(id);
+            if (!sel || document.getElementById(`porg_nav_btn_${id}`)) continue;
+            const btn = document.createElement('i');
+            btn.id = `porg_nav_btn_${id}`;
+            btn.className = 'fa-solid fa-table-cells-large porg-nav-btn interactable';
+            btn.title = `Browse ${label} presets visually`;
+            btn.tabIndex = 0;
+            sel.insertAdjacentElement('afterend', btn);
+            btn.addEventListener('click', () => openNavigator(sel, label, id));
+        }
     }
 
     function closeNavigator() {
@@ -345,9 +369,8 @@
 
     function navEsc(e) { if (e.key === 'Escape') closeNavigator(); }
 
-    function openNavigator() {
+    function openNavigator(sel, label, selectId) {
         closeNavigator();
-        const sel = presetSelect();
         if (!sel) return;
         const current = sel.selectedOptions[0]?.textContent.trim();
 
@@ -357,7 +380,7 @@
             <div class="porg-nav-modal">
                 <div class="porg-nav-head">
                     <i class="fa-solid fa-table-cells-large"></i>
-                    <b>Presets</b>
+                    <b>${label} presets</b>
                     <input id="porg_nav_search" class="text_pole" type="text"
                            placeholder="Search presets…" autocomplete="off">
                     <span class="porg-nav-close" title="Close">×</span>
@@ -372,7 +395,7 @@
         const grid = overlay.querySelector('.porg-nav-grid');
 
         function renderGrid(filter = '') {
-            const favs = new Set(settings().favorites);
+            const favs = new Set(favBucket(selectId));
             const q = filter.trim().toLowerCase();
             const names = [...sel.options].map(o => o.textContent.trim())
                 .filter(n => !q || n.toLowerCase().includes(q))
@@ -394,7 +417,7 @@
 
                 card.querySelector('.porg-nav-fav').addEventListener('click', (e) => {
                     e.stopPropagation();
-                    const f = settings().favorites;
+                    const f = favBucket(selectId);
                     const idx = f.indexOf(name);
                     idx >= 0 ? f.splice(idx, 1) : f.push(name);
                     save();
@@ -500,7 +523,7 @@
             if (applying) return;
             // ST re-rendered the prompt list → re-decorate (debounced)
             clearTimeout(watch._t);
-            watch._t = setTimeout(apply, 60);
+            watch._t = setTimeout(() => { apply(); addNavButtons(); }, 60);
         });
         observer.observe(target, { childList: true, subtree: true });
     }
@@ -510,9 +533,10 @@
         addSettingsDrawer();
         watch();
         apply();
+        addNavButtons();
         // Preset switches and settings updates can rebuild the manager wholesale
         for (const ev of [event_types.OAI_PRESET_CHANGED_AFTER, event_types.SETTINGS_UPDATED, event_types.CHAT_CHANGED]) {
-            if (ev) eventSource.on(ev, () => setTimeout(apply, 100));
+            if (ev) eventSource.on(ev, () => setTimeout(() => { apply(); addNavButtons(); }, 100));
         }
         console.log('[Preset Organizer] ready');
     }
